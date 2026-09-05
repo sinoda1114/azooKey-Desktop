@@ -604,17 +604,19 @@ public final class SegmentsManager {
             result.firstClauseResults = preferred + result.firstClauseResults.filter { !preferredTexts.contains($0.text) }
         }
         let codeVariants = HyphenatedCodeCandidates.variants(for: self.composingText.convertTarget)
-        let codeTexts = Set(result.mainResults.map(\.text))
-        let codeCandidates = codeVariants.filter { !codeTexts.contains($0) }.map { text in
-            Candidate(
-                text: text, value: -18,
-                composingCount: .surfaceCount(self.composingText.convertTarget.count),
-                lastMid: MIDData.一般.mid,
-                data: [.init(word: text, ruby: self.composingText.convertTarget, cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: -18)],
-                isLearningTarget: false
-            )
+        if self.composingText.isAtEndIndex, !codeVariants.isEmpty {
+            let codeTexts = Set(result.mainResults.map(\.text))
+            let codeCandidates = codeVariants.filter { !codeTexts.contains($0) }.map { text in
+                Candidate(
+                    text: text, value: -18,
+                    composingCount: .surfaceCount(self.composingText.convertTarget.count),
+                    lastMid: MIDData.一般.mid,
+                    data: [.init(word: text, ruby: self.composingText.convertTarget, cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: -18)],
+                    isLearningTarget: false
+                )
+            }
+            result.mainResults.insert(contentsOf: codeCandidates, at: min(5, result.mainResults.count))
         }
-        result.mainResults.insert(contentsOf: codeCandidates, at: min(5, result.mainResults.count))
         self.rawCandidates = result
     }
 
