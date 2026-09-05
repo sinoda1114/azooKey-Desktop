@@ -58,6 +58,13 @@ extension ConverterServer {
                 value: .bool(Config.TypeHalfSpace().value)
             ),
             descriptor(
+                key: Config.TypeHalfWidthLongVowelMark.key,
+                title: "ハイフンは半角を入力",
+                section: "入力オプション",
+                kind: .toggle,
+                value: .bool(Config.TypeHalfWidthLongVowelMark().value)
+            ),
+            descriptor(
                 key: Config.OptionDirectFullWidthInput.key,
                 title: "Optionキーで直接全角英数を入力",
                 section: "入力オプション",
@@ -233,6 +240,8 @@ extension ConverterServer {
             Config.TypeBackSlash().value = try boolSettingValue(value, key: key)
         case Config.TypeHalfSpace.key:
             Config.TypeHalfSpace().value = try boolSettingValue(value, key: key)
+        case Config.TypeHalfWidthLongVowelMark.key:
+            Config.TypeHalfWidthLongVowelMark().value = try boolSettingValue(value, key: key)
         case Config.OptionDirectFullWidthInput.key:
             Config.OptionDirectFullWidthInput().value = try boolSettingValue(value, key: key)
         case Config.PunctuationStyle.key:

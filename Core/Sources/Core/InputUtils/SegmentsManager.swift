@@ -17,13 +17,22 @@ public final class SegmentsManager {
     /// テストなどの設定注入のための型。外部には設定を露出させない。
     public struct Context {
         public init() {}
-        public init(useZenzai: Bool, resourcesDirectoryURL: URL? = nil) {
+        public init(
+            useZenzai: Bool,
+            resourcesDirectoryURL: URL? = nil,
+            liveConversionEnabled: Bool? = nil,
+            typeHalfWidthLongVowelMark: Bool? = nil
+        ) {
             self.useZenzai = useZenzai
             self.resourcesDirectoryURL = resourcesDirectoryURL
+            self.liveConversionEnabled = liveConversionEnabled
+            self.typeHalfWidthLongVowelMark = typeHalfWidthLongVowelMark
         }
 
         var useZenzai: Bool = true
         var resourcesDirectoryURL: URL?
+        var liveConversionEnabled: Bool?
+        var typeHalfWidthLongVowelMark: Bool?
     }
 
     public weak var delegate: (any SegmentManagerDelegate)?
@@ -36,7 +45,11 @@ public final class SegmentsManager {
     private var lastInputStyle: InputStyle = .direct
 
     private var liveConversionEnabled: Bool {
-        Config.LiveConversion().value
+        self.context.liveConversionEnabled ?? Config.LiveConversion().value
+    }
+    private var prefersHalfWidthStandaloneLongVowelMark: Bool {
+        self.composingText.convertTarget == "ー"
+            && (self.context.typeHalfWidthLongVowelMark ?? Config.TypeHalfWidthLongVowelMark().value)
     }
     private var zenzaiPersonalizationLevel: Config.ZenzaiPersonalizationLevel.Value {
         Config.ZenzaiPersonalizationLevel().value
@@ -564,7 +577,7 @@ public final class SegmentsManager {
 
         let leftSideContext = forcedLeftSideContext ?? self.getCleanLeftSideContext(maxCount: ContextLength.conversion)
         let rightSideContext = forcedRightSideContext ?? self.getCleanRightSideContext(maxCount: ContextLength.conversion)
-        let result = self.kanaKanjiConverter.requestCandidates(
+        var result = self.kanaKanjiConverter.requestCandidates(
             self.composingText,
             options: options(
                 leftSideContext: leftSideContext,
@@ -574,6 +587,34 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
+        if self.prefersHalfWidthStandaloneLongVowelMark {
+            // 読みは全角のまま保持し、半角・全角を通常の変換候補として選択できるようにする。
+            let preferred = ["ｰ", "ー"].map { text in
+                Candidate(
+                    text: text,
+                    value: 0,
+                    composingCount: .surfaceCount(1),
+                    lastMid: MIDData.一般.mid,
+                    data: [.init(word: text, ruby: "ー", cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: 0)],
+                    isLearningTarget: false
+                )
+            }
+            let preferredTexts = Set(preferred.map(\.text))
+            result.mainResults = preferred + result.mainResults.filter { !preferredTexts.contains($0.text) }
+            result.firstClauseResults = preferred + result.firstClauseResults.filter { !preferredTexts.contains($0.text) }
+        }
+        let codeVariants = HyphenatedCodeCandidates.variants(for: self.composingText.convertTarget)
+        let codeTexts = Set(result.mainResults.map(\.text))
+        let codeCandidates = codeVariants.filter { !codeTexts.contains($0) }.map { text in
+            Candidate(
+                text: text, value: -18,
+                composingCount: .surfaceCount(self.composingText.convertTarget.count),
+                lastMid: MIDData.一般.mid,
+                data: [.init(word: text, ruby: self.composingText.convertTarget, cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: -18)],
+                isLearningTarget: false
+            )
+        }
+        result.mainResults.insert(contentsOf: codeCandidates, at: min(5, result.mainResults.count))
         self.rawCandidates = result
     }
 
@@ -1058,7 +1099,9 @@ public final class SegmentsManager {
         case .none, .attachDiacritic:
             return MarkedText(text: [], selectionRange: .notFound)
         case .composing:
-            let text = if self.lastOperation == .delete {
+            let text = if self.prefersHalfWidthStandaloneLongVowelMark {
+                "ｰ"
+            } else if self.lastOperation == .delete {
                 // 削除のあとは常にひらがなを示す
                 self.composingText.convertTarget
             } else if self.liveConversionEnabled,

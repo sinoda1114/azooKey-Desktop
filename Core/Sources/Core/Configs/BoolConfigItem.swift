@@ -56,6 +56,12 @@ extension Config {
         static let `default` = false
         public static let key: String = "dev.ensan.inputmethod.azooKeyMac.preference.typeHalfSpace"
     }
+    /// 単独の長音符を半角で入力する設定
+    public struct TypeHalfWidthLongVowelMark: BoolConfigItem {
+        public init() {}
+        static let `default` = false
+        public static let key: String = "dev.ensan.inputmethod.azooKeyMac.preference.typeHalfWidthLongVowelMark"
+    }
     /// Optionキー押下時に直接全角英数を入力する設定
     public struct OptionDirectFullWidthInput: BoolConfigItem {
         public init() {}
