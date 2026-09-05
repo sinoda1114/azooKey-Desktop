@@ -564,7 +564,7 @@ public final class SegmentsManager {
 
         let leftSideContext = forcedLeftSideContext ?? self.getCleanLeftSideContext(maxCount: ContextLength.conversion)
         let rightSideContext = forcedRightSideContext ?? self.getCleanRightSideContext(maxCount: ContextLength.conversion)
-        let result = self.kanaKanjiConverter.requestCandidates(
+        var result = self.kanaKanjiConverter.requestCandidates(
             self.composingText,
             options: options(
                 leftSideContext: leftSideContext,
@@ -574,6 +574,21 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
+        let relativeDates = RelativeDateShortcuts.candidates(matching: composingText.convertTarget.toKatakana())
+        if !relativeDates.isEmpty {
+            let existingTexts = Set(result.mainResults.map(\.text))
+            let candidates = relativeDates.filter { !existingTexts.contains($0.word) }.map { element in
+                Candidate(
+                    text: element.word,
+                    value: element.value(),
+                    composingCount: .surfaceCount(composingText.convertTarget.count),
+                    lastMid: element.mid,
+                    data: [element],
+                    isLearningTarget: false
+                )
+            }
+            result.mainResults.insert(contentsOf: candidates, at: min(5, result.mainResults.count))
+        }
         self.rawCandidates = result
     }
 
