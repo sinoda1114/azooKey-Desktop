@@ -100,34 +100,49 @@ struct DateCandidatePreferenceTests {
         }
     }
 
-    @Test func numericInputGetsThisYearsWeekdayAndKeepsOriginal() throws {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try #require(TimeZone(identifier: "Asia/Tokyo"))
-        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 5)))
-        for ruby in ["1111", "１１１１"] {
-            let dateEntry = DicdataElement(word: "11/11", ruby: ruby, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)
-            let original = [candidate("1111"), candidate("11/11")]
-            let result = DateCandidatePreference.applying(to: original, dateEntries: [dateEntry], readingCount: 4,
-                                                         preference: .weekday, now: now, calendar: calendar)
-            #expect(result.map(\.text) == ["1111", "11月11日（水）", "11/11"])
-            let added = try #require(result.first { $0.text == "11月11日（水）" })
-            #expect(!added.isLearningTarget)
-            var composing = ComposingText()
-            composing.insertAtCursorPosition(ruby, inputStyle: .direct)
-            composing.prefixComplete(composingCount: added.composingCount)
-            #expect(composing.isEmpty)
+    @MainActor
+    @Test(arguments: [Config.DateFormatPreference.Value.monthDay, .weekday])
+    func shorteningDateReadingDoesNotOfferWholeReadingDates(preference: Config.DateFormatPreference.Value) throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let manager = SegmentsManager(kanaKanjiConverter: .withDefaultDictionary(),
+                                      applicationDirectoryURL: directory, containerURL: nil,
+                                      context: .init(useZenzai: false, dateFormatPreference: preference))
+        manager.insertAtCursorPosition("きょう", inputStyle: .direct)
+        manager.editSegment(count: -1)
+        for rich in [false, true] {
+            manager.update(requestRichCandidates: rich)
+            manager.requestSetCandidateWindowState(visible: true)
+            guard case .selecting(let candidates, _) = manager.getCurrentCandidateWindow(inputState: .selecting) else {
+                Issue.record("候補欄が表示されません")
+                return
+            }
+            #expect(!candidates.contains {
+                $0.text.range(of: #"^[0-9]{2}/[0-9]{2}$|^[0-9]+月[0-9]+日（[日月火水木金土]）$"#,
+                              options: .regularExpression) != nil
+            })
         }
     }
 
-    @Test func numericLeapDayOnlyGetsWeekdayInLeapYear() throws {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try #require(TimeZone(identifier: "Asia/Tokyo"))
-        let entry = DicdataElement(word: "02/29", ruby: "0229", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)
-        let commonYear = try #require(calendar.date(from: DateComponents(year: 2026, month: 1, day: 1)))
-        let leapYear = try #require(calendar.date(from: DateComponents(year: 2028, month: 1, day: 1)))
-        #expect(DateCandidatePreference.numericWeekday(entry, now: commonYear, calendar: calendar) == nil)
-        #expect(DateCandidatePreference.numericWeekday(entry, now: leapYear, calendar: calendar) == "2月29日（火）")
-        #expect(DateCandidatePreference.numericWeekday(self.entry("11/11"), now: commonYear, calendar: calendar) == nil)
+    @MainActor
+    @Test func numericReadingDoesNotGenerateWeekdayDates() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let manager = SegmentsManager(kanaKanjiConverter: .withDefaultDictionary(),
+                                      applicationDirectoryURL: directory, containerURL: nil,
+                                      context: .init(useZenzai: false, dateFormatPreference: .weekday))
+        manager.insertAtCursorPosition("1111", inputStyle: .direct)
+        manager.update(requestRichCandidates: true)
+        manager.requestSetCandidateWindowState(visible: true)
+        guard case .selecting(let candidates, _) = manager.getCurrentCandidateWindow(inputState: .selecting) else {
+            Issue.record("候補欄が表示されません")
+            return
+        }
+        #expect(candidates.contains { $0.text == "1111" })
+        #expect(!candidates.contains {
+            $0.text.range(of: #"^[0-9]+月[0-9]+日（[日月火水木金土]）$"#, options: .regularExpression) != nil
+        })
     }
-
 }

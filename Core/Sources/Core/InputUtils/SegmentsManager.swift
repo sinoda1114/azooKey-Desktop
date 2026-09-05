@@ -577,21 +577,24 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
-        let dateEntries = dynamicShortcuts.compactMap { entry -> DicdataElement? in
-            guard entry.ruby == self.composingText.convertTarget.toKatakana(),
-                  entry.word.hasPrefix("<date ") else {
-                return nil
+        // 文節を縮めたときは、入力全体に対する日付を補完しない。
+        if self.composingText.isAtEndIndex {
+            let dateEntries = dynamicShortcuts.compactMap { entry -> DicdataElement? in
+                guard entry.ruby == self.composingText.convertTarget.toKatakana(),
+                      entry.word.hasPrefix("<date ") else {
+                    return nil
+                }
+                let template = DateTemplateLiteral.import(from: entry.word)
+                guard template.format.contains("d") else {
+                    return nil
+                }
+                return .init(word: template.previewString(), ruby: entry.ruby, cid: CIDData.固有名詞.cid,
+                             mid: MIDData.一般.mid, value: entry.value())
             }
-            let template = DateTemplateLiteral.import(from: entry.word)
-            guard template.format.contains("d") else {
-                return nil
-            }
-            return .init(word: template.previewString(), ruby: entry.ruby, cid: CIDData.固有名詞.cid,
-                         mid: MIDData.一般.mid, value: entry.value())
+            DateCandidatePreference.apply(to: &result, dateEntries: dateEntries,
+                                          readingCount: self.composingText.convertTarget.count,
+                                          preference: self.context.dateFormatPreference ?? Config.DateFormatPreference().value)
         }
-        DateCandidatePreference.apply(to: &result, dateEntries: dateEntries,
-                                      readingCount: self.composingText.convertTarget.count,
-                                      preference: self.context.dateFormatPreference ?? Config.DateFormatPreference().value)
         self.rawCandidates = result
     }
 

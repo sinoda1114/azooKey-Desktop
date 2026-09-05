@@ -17,8 +17,7 @@ enum DateCandidatePreference {
 
     static func applying(
         to candidates: [Candidate], dateEntries: [DicdataElement], readingCount: Int,
-        preference: Config.DateFormatPreference.Value,
-        now: Date = Date(), calendar: Calendar = .current
+        preference: Config.DateFormatPreference.Value
     ) -> [Candidate] {
         guard preference != .standard, !dateEntries.isEmpty else {
             return candidates
@@ -28,13 +27,6 @@ enum DateCandidatePreference {
             for entry in dateEntries {
                 guard let padded = paddedMonthDay(entry.word), padded != entry.word else { continue }
                 entries.append(.init(word: padded, ruby: entry.ruby, cid: CIDData.固有名詞.cid,
-                                     mid: MIDData.一般.mid, value: entry.value()))
-            }
-        }
-        if preference == .weekday {
-            for entry in dateEntries {
-                guard let text = numericWeekday(entry, now: now, calendar: calendar) else { continue }
-                entries.append(.init(word: text, ruby: entry.ruby, cid: CIDData.固有名詞.cid,
                                      mid: MIDData.一般.mid, value: entry.value()))
             }
         }
@@ -79,38 +71,6 @@ enum DateCandidatePreference {
             return nil
         }
         return String(format: "%02d/%02d", parts[0], parts[1])
-    }
-
-    /// 年のない4桁入力だけを今年の月日として解釈する。相対日付の年は変更しない。
-    static func numericWeekday(_ entry: DicdataElement, now: Date, calendar: Calendar) -> String? {
-        let digits = entry.ruby.unicodeScalars.compactMap { scalar -> Int? in
-            switch scalar.value {
-            case 0x30...0x39: Int(scalar.value - 0x30)
-            case 0xFF10...0xFF19: Int(scalar.value - 0xFF10)
-            default: nil
-            }
-        }
-        guard entry.ruby.unicodeScalars.count == 4, digits.count == 4,
-              paddedMonthDay(entry.word) == "\(digits[0])\(digits[1])/\(digits[2])\(digits[3])" else {
-            return nil
-        }
-        var gregorian = Calendar(identifier: .gregorian)
-        gregorian.timeZone = calendar.timeZone
-        let year = gregorian.component(.year, from: now)
-        let month = digits[0] * 10 + digits[1]
-        let day = digits[2] * 10 + digits[3]
-        guard let date = gregorian.date(from: DateComponents(year: year, month: month, day: day, hour: 12)),
-              gregorian.component(.year, from: date) == year,
-              gregorian.component(.month, from: date) == month,
-              gregorian.component(.day, from: date) == day else {
-            return nil
-        }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.calendar = gregorian
-        formatter.timeZone = gregorian.timeZone
-        formatter.dateFormat = "M月d日（E）"
-        return formatter.string(from: date)
     }
 
     private static func isPreferred(_ text: String, preference: Config.DateFormatPreference.Value) -> Bool {
