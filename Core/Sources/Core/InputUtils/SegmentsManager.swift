@@ -574,18 +574,18 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
-        if let monthDay = NumericDateShortcuts.monthDay(matching: self.composingText.convertTarget),
-           !result.mainResults.contains(where: { $0.text == monthDay }) {
-            let candidate = Candidate(
-                text: monthDay,
-                value: -18,
-                composingCount: .surfaceCount(self.composingText.convertTarget.count),
-                lastMid: MIDData.一般.mid,
-                data: [.init(word: monthDay, ruby: self.composingText.convertTarget, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)],
-                isLearningTarget: false
-            )
-            result.mainResults.insert(candidate, at: min(5, result.mainResults.count))
-        }
+        let separatorTexts = Set(result.mainResults.map(\.text))
+        let separatorCandidates = NumericSeparatorCandidates.variants(for: self.composingText.convertTarget)
+            .filter { !separatorTexts.contains($0) }.map { text in
+                Candidate(
+                    text: text, value: -18,
+                    composingCount: .inputCount(self.composingText.input.count),
+                    lastMid: MIDData.一般.mid,
+                    data: [.init(word: text, ruby: self.composingText.convertTarget.toKatakana(), cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: -18)],
+                    isLearningTarget: false
+                )
+            }
+        result.mainResults.insert(contentsOf: separatorCandidates, at: min(5, result.mainResults.count))
         self.rawCandidates = result
     }
 
