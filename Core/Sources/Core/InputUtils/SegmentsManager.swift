@@ -574,21 +574,21 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
-        let postalAddresses = PostalAddressShortcuts.addresses(matching: self.composingText.convertTarget)
-        var postalTexts = Set(result.mainResults.map(\.text))
-        let postalCandidates = postalAddresses.compactMap { address -> Candidate? in
-            guard postalTexts.insert(address).inserted else {
-                return nil
+        let relativeDates = RelativeDateShortcuts.candidates(matching: composingText.convertTarget.toKatakana())
+        if !relativeDates.isEmpty {
+            let existingTexts = Set(result.mainResults.map(\.text))
+            let candidates = relativeDates.filter { !existingTexts.contains($0.word) }.map { element in
+                Candidate(
+                    text: element.word,
+                    value: element.value(),
+                    composingCount: .surfaceCount(composingText.convertTarget.count),
+                    lastMid: element.mid,
+                    data: [element],
+                    isLearningTarget: false
+                )
             }
-            return Candidate(
-                text: address, value: -18,
-                composingCount: .surfaceCount(self.composingText.convertTarget.count),
-                lastMid: MIDData.一般.mid,
-                data: [.init(word: address, ruby: self.composingText.convertTarget, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)],
-                isLearningTarget: false
-            )
+            result.mainResults.insert(contentsOf: candidates, at: min(5, result.mainResults.count))
         }
-        result.mainResults.insert(contentsOf: postalCandidates, at: min(5, result.mainResults.count))
         self.rawCandidates = result
     }
 
