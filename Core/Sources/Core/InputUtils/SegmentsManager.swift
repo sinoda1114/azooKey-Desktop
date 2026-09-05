@@ -580,11 +580,7 @@ public final class SegmentsManager {
             let existingTexts = Set(result.mainResults.map(\.text))
             let arrowCandidates = arrowVariants.filter { !existingTexts.contains($0) }.map { text in
                 Candidate(
-                    text: text, value: -18,
-                    composingCount: .inputCount(arrowInput.input.count),
-                    lastMid: MIDData.一般.mid,
-                    data: [.init(word: text, ruby: arrowInput.convertTarget, cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: -18)],
-                    isLearningTarget: false
+                    lastMid: 0,
                 )
             }
             result.mainResults.insert(contentsOf: arrowCandidates, at: min(5, result.mainResults.count))
