@@ -17,13 +17,16 @@ public final class SegmentsManager {
     /// テストなどの設定注入のための型。外部には設定を露出させない。
     public struct Context {
         public init() {}
-        public init(useZenzai: Bool, resourcesDirectoryURL: URL? = nil) {
+        public init(useZenzai: Bool, resourcesDirectoryURL: URL? = nil,
+                    dateFormatPreference: Config.DateFormatPreference.Value? = nil) {
             self.useZenzai = useZenzai
             self.resourcesDirectoryURL = resourcesDirectoryURL
+            self.dateFormatPreference = dateFormatPreference
         }
 
         var useZenzai: Bool = true
         var resourcesDirectoryURL: URL?
+        var dateFormatPreference: Config.DateFormatPreference.Value?
     }
 
     public weak var delegate: (any SegmentManagerDelegate)?
@@ -532,11 +535,16 @@ public final class SegmentsManager {
         }
         /// 日付・時刻変換を事前に入れておく
         let dynamicShortcuts: [DicdataElement] =
-            DateShortcuts.formats.flatMap { dateFormat -> [DicdataElement] in
-                let format = dateFormat.pattern
-                let value = dateFormat.value
-                let type = dateFormat.calendarType
-                return [
+            [
+                ("M/d", -18, DateTemplateLiteral.CalendarType.western),
+                ("yyyy/MM/dd", -18.1, .western),
+                ("yyyy-MM-dd", -18.2, .western),
+                ("M月d日（E）", -18.3, .western),
+                ("yyyy年M月d日", -18.4, .western),
+                ("Gyyyy年M月d日", -18.5, .japanese),
+                ("E曜日", -18.6, .western)
+            ].flatMap { (format, value: PValue, type) in
+                [
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "-2", deltaUnit: 60 * 60 * 24).export(), ruby: "オトトイ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "-1", deltaUnit: 60 * 60 * 24).export(), ruby: "キノウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "0", deltaUnit: 1).export(), ruby: "キョウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
@@ -569,23 +577,21 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
-        // 曜日の日付候補を通常候補の後に補い、エンジンの上位候補の絞り込みによる欠落を防ぐ。
-        let weekdayShortcuts = DateShortcuts.weekdays(matching: composingText.convertTarget.toKatakana())
-        var seen = Set(result.mainResults.map(\.text))
-        let weekdayCandidates = weekdayShortcuts.compactMap { data -> Candidate? in
-            guard seen.insert(data.word).inserted else {
+        let dateEntries = dynamicShortcuts.compactMap { entry -> DicdataElement? in
+            guard entry.ruby == self.composingText.convertTarget.toKatakana(),
+                  entry.word.hasPrefix("<date ") else {
                 return nil
             }
-            return Candidate(
-                text: data.word,
-                value: data.value(),
-                composingCount: .surfaceCount(composingText.convertTarget.count),
-                lastMid: data.mid,
-                data: [data],
-                isLearningTarget: false
-            )
+            let template = DateTemplateLiteral.import(from: entry.word)
+            guard template.format.contains("d") else {
+                return nil
+            }
+            return .init(word: template.previewString(), ruby: entry.ruby, cid: CIDData.固有名詞.cid,
+                         mid: MIDData.一般.mid, value: entry.value())
         }
-        result.mainResults.insert(contentsOf: weekdayCandidates, at: min(5, result.mainResults.count))
+        DateCandidatePreference.apply(to: &result, dateEntries: dateEntries,
+                                      readingCount: self.composingText.convertTarget.count,
+                                      preference: self.context.dateFormatPreference ?? Config.DateFormatPreference().value)
         self.rawCandidates = result
     }
 
