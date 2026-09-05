@@ -571,7 +571,7 @@ public final class SegmentsManager {
         )
         // 曜日の日付候補を通常候補の後に補い、エンジンの上位候補の絞り込みによる欠落を防ぐ。
         let weekdayShortcuts = DateShortcuts.weekdays(matching: composingText.convertTarget.toKatakana())
-        if !weekdayShortcuts.isEmpty {
+        if self.composingText.isAtEndIndex, !weekdayShortcuts.isEmpty {
             var seen = Set(result.mainResults.map(\.text))
             let weekdayCandidates = weekdayShortcuts.compactMap { data -> Candidate? in
                 guard seen.insert(data.word).inserted else {
