@@ -574,21 +574,19 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
-        let relativeDates = RelativeDateShortcuts.candidates(matching: composingText.convertTarget.toKatakana())
-        if !relativeDates.isEmpty {
-            let existingTexts = Set(result.mainResults.map(\.text))
-            let candidates = relativeDates.filter { !existingTexts.contains($0.word) }.map { element in
+        let romanInput = self.composingText.input.map(\.piece).inputString(preferIntention: false)
+        let romanTexts = Set(result.mainResults.map(\.text))
+        let romanCandidates = RomanCaseCandidates.variants(for: romanInput)
+            .filter { !romanTexts.contains($0) }.map { text in
                 Candidate(
-                    text: element.word,
-                    value: element.value(),
-                    composingCount: .surfaceCount(composingText.convertTarget.count),
-                    lastMid: element.mid,
-                    data: [element],
+                    text: text, value: -18,
+                    composingCount: .inputCount(self.composingText.input.count),
+                    lastMid: MIDData.一般.mid,
+                    data: [.init(word: text, ruby: self.composingText.convertTarget.toKatakana(), cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)],
                     isLearningTarget: false
                 )
             }
-            result.mainResults.insert(contentsOf: candidates, at: min(5, result.mainResults.count))
-        }
+        result.mainResults.insert(contentsOf: romanCandidates, at: min(5, result.mainResults.count))
         self.rawCandidates = result
     }
 
