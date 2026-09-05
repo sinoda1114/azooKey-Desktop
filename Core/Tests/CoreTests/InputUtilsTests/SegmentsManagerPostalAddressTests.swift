@@ -36,6 +36,23 @@ struct SegmentsManagerPostalAddressTests {
         }
     }
 
+    @Test func editedSegmentDoesNotOfferWholePostalAddress() throws {
+        try withManager { manager in
+            manager.insertAtCursorPosition("2400054", inputStyle: .direct)
+            manager.editSegment(count: -1)
+            manager.update(requestRichCandidates: true)
+            manager.requestSetCandidateWindowState(visible: true)
+            guard case .selecting(let choices, _) = manager.getCurrentCandidateWindow(inputState: .selecting) else {
+                Issue.record("Expected edited-segment candidates")
+                return
+            }
+            #expect(!choices.contains { $0.text == "神奈川県横浜市保土ケ谷区西谷" })
+            #expect(manager.convertTarget == "2400054")
+            manager.editSegment(count: 1)
+            try checkAndCommit(manager)
+        }
+    }
+
     private func checkAndCommit(_ manager: SegmentsManager) throws {
         let original = manager.convertTarget
         for rich in [false, true] {

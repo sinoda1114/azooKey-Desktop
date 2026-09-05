@@ -1,4 +1,5 @@
 @testable import Core
+import Foundation
 import Testing
 
 @Suite("Postal address shortcuts")
@@ -62,6 +63,34 @@ struct PostalAddressShortcutsTests {
         let entries = PostalAddressShortcuts.parseAddresses("0010001\t住所一\r\n0010002\t住所二")
         #expect(entries["0010001"] == ["住所一"])
         #expect(entries["0010002"] == ["住所二"])
+    }
+
+    @Test(arguments: ["\n", "\r\n"])
+    func directLookupFindsBoundaryRowsAndAllMatchingAddresses(newline: String) {
+        // 最終行の改行なし、UTF-8 の長い行、同じ番号の複数行も検索する。
+        let rows = [
+            "0010001\t北海道テスト市一丁目",
+            "0010001\t北海道テスト市二丁目",
+            "0010001\t北海道テスト市二丁目",
+            "2400054\t神奈川県横浜市保土ケ谷区西谷",
+            "9999999\t末尾の住所"
+        ]
+        let data = Data(rows.joined(separator: newline).utf8)
+        #expect(PostalAddressShortcuts.addresses(in: data, postalCode: "0010001") == ["北海道テスト市一丁目", "北海道テスト市二丁目"])
+        #expect(PostalAddressShortcuts.addresses(in: data, postalCode: "2400054") == ["神奈川県横浜市保土ケ谷区西谷"])
+        #expect(PostalAddressShortcuts.addresses(in: data, postalCode: "9999999") == ["末尾の住所"])
+        for missing in ["0000000", "0010002", "9999998"] {
+            #expect(PostalAddressShortcuts.addresses(in: data, postalCode: missing).isEmpty)
+        }
+    }
+
+    @Test func directLookupHandlesEmptyAndSingleRowData() {
+        #expect(PostalAddressShortcuts.addresses(in: Data(), postalCode: "2400054").isEmpty)
+        for newline in ["", "\n"] {
+            let data = Data(("2400054\t神奈川県横浜市保土ケ谷区西谷" + newline).utf8)
+            #expect(PostalAddressShortcuts.addresses(in: data, postalCode: "2400054") == ["神奈川県横浜市保土ケ谷区西谷"])
+            #expect(PostalAddressShortcuts.addresses(in: data, postalCode: "9999999").isEmpty)
+        }
     }
 
     @Test func unknownPostalCodeHasNoCandidates() {
