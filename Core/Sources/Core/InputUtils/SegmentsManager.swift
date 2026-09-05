@@ -574,18 +574,21 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
-        let separatorTexts = Set(result.mainResults.map(\.text))
-        let separatorCandidates = NumericSeparatorCandidates.variants(for: self.composingText.convertTarget)
-            .filter { !separatorTexts.contains($0) }.map { text in
+        let separatorInput = self.composingText.prefixToCursorPosition()
+        let separatorVariants = NumericSeparatorCandidates.variants(for: separatorInput.convertTarget)
+        if !separatorVariants.isEmpty {
+            let separatorTexts = Set(result.mainResults.map(\.text))
+            let separatorCandidates = separatorVariants.filter { !separatorTexts.contains($0) }.map { text in
                 Candidate(
                     text: text, value: -18,
-                    composingCount: .inputCount(self.composingText.input.count),
+                    composingCount: .inputCount(separatorInput.input.count),
                     lastMid: MIDData.一般.mid,
-                    data: [.init(word: text, ruby: self.composingText.convertTarget.toKatakana(), cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: -18)],
+                    data: [.init(word: text, ruby: separatorInput.convertTarget.toKatakana(), cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: -18)],
                     isLearningTarget: false
                 )
             }
-        result.mainResults.insert(contentsOf: separatorCandidates, at: min(5, result.mainResults.count))
+            result.mainResults.insert(contentsOf: separatorCandidates, at: min(5, result.mainResults.count))
+        }
         self.rawCandidates = result
     }
 
