@@ -55,30 +55,15 @@ enum RelativeDateShortcuts {
         return days
     }
 
-    private struct Format {
-        let pattern: String
-        let value: PValue
-        let calendar: Calendar.Identifier
-    }
-
     static func candidates(matching ruby: String, now: Date = Date(), calendar: Calendar = .current) -> [DicdataElement] {
         guard let date = date(matching: ruby, now: now, calendar: calendar) else {
             return []
         }
-        let formats: [Format] = [
-            .init(pattern: "M/d", value: -18, calendar: .gregorian),
-            .init(pattern: "yyyy/MM/dd", value: -18.1, calendar: .gregorian),
-            .init(pattern: "yyyy-MM-dd", value: -18.2, calendar: .gregorian),
-            .init(pattern: "M月d日（E）", value: -18.3, calendar: .gregorian),
-            .init(pattern: "yyyy年M月d日", value: -18.4, calendar: .gregorian),
-            .init(pattern: "Gyyyy年M月d日", value: -18.5, calendar: .japanese),
-            .init(pattern: "E曜日", value: -18.6, calendar: .gregorian)
-        ]
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ja_JP")
         formatter.timeZone = calendar.timeZone
-        return formats.map { format in
-            formatter.calendar = Calendar(identifier: format.calendar)
+        return DateShortcutFormats.all.map { format in
+            formatter.calendar = Calendar(identifier: format.calendar == .japanese ? .japanese : .gregorian)
             formatter.dateFormat = format.pattern
             return DicdataElement(word: formatter.string(from: date), ruby: ruby, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: format.value)
         }

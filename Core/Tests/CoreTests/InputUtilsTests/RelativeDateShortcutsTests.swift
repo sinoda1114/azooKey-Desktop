@@ -95,6 +95,37 @@ struct RelativeDateShortcutsTests {
     }
 
     @MainActor
+    @Test(arguments: ["げつまつ", "らいしゅうのげつよう", "3にちご"])
+    func shortenedSegmentDoesNotOfferWholeInputDate(_ reading: String) throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let manager = SegmentsManager(
+            kanaKanjiConverter: .withDefaultDictionary(), applicationDirectoryURL: directory,
+            containerURL: nil, context: .init(useZenzai: false)
+        )
+        manager.insertAtCursorPosition(reading, inputStyle: .direct)
+        manager.editSegment(count: -1)
+        for rich in [false, true] {
+            manager.update(requestRichCandidates: rich)
+            manager.requestSetCandidateWindowState(visible: true)
+            guard case .selecting(let candidates, _) = manager.getCurrentCandidateWindow(inputState: .selecting) else {
+                Issue.record("Expected selecting state")
+                return
+            }
+            #expect(!candidates.contains { $0.text.range(of: #"^\d{4}/\d{2}/\d{2}$"#, options: .regularExpression) != nil })
+        }
+        manager.editSegment(count: reading.count)
+        manager.update(requestRichCandidates: true)
+        guard case .selecting(let candidates, _) = manager.getCurrentCandidateWindow(inputState: .selecting) else {
+            Issue.record("Expected selecting state")
+            return
+        }
+        let candidate = try #require(candidates.first { $0.text.range(of: #"^\d{4}/\d{2}/\d{2}$"#, options: .regularExpression) != nil })
+        manager.prefixCandidateCommited(candidate, leftSideContext: "")
+        #expect(manager.isEmpty)
+    }
+
+    @MainActor
     private func verifyWholeInput(_ input: String, inputStyle: InputStyle) throws {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

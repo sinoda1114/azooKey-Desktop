@@ -532,16 +532,11 @@ public final class SegmentsManager {
         }
         /// 日付・時刻変換を事前に入れておく
         let dynamicShortcuts: [DicdataElement] =
-            [
-                ("M/d", -18, DateTemplateLiteral.CalendarType.western),
-                ("yyyy/MM/dd", -18.1, .western),
-                ("yyyy-MM-dd", -18.2, .western),
-                ("M月d日（E）", -18.3, .western),
-                ("yyyy年M月d日", -18.4, .western),
-                ("Gyyyy年M月d日", -18.5, .japanese),
-                ("E曜日", -18.6, .western)
-            ].flatMap { (format, value: PValue, type) in
-                [
+            DateShortcutFormats.all.flatMap { dateFormat -> [DicdataElement] in
+                let format = dateFormat.pattern
+                let value = dateFormat.value
+                let type = dateFormat.calendar
+                return [
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "-2", deltaUnit: 60 * 60 * 24).export(), ruby: "オトトイ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "-1", deltaUnit: 60 * 60 * 24).export(), ruby: "キノウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "0", deltaUnit: 1).export(), ruby: "キョウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
@@ -574,7 +569,10 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
-        let relativeDates = RelativeDateShortcuts.candidates(matching: composingText.convertTarget.toKatakana())
+        // 全体入力に対する候補は文節を短くしている間には出さない。
+        let relativeDates = composingText.isAtEndIndex
+            ? RelativeDateShortcuts.candidates(matching: composingText.convertTarget.toKatakana())
+            : []
         if !relativeDates.isEmpty {
             let existingTexts = Set(result.mainResults.map(\.text))
             let candidates = relativeDates.filter { !existingTexts.contains($0.word) }.map { element in
