@@ -574,7 +574,8 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
-        if let monthDay = NumericDateShortcuts.monthDay(matching: self.composingText.convertTarget),
+        if self.composingText.isAtEndIndex,
+           let monthDay = NumericDateShortcuts.monthDay(matching: self.composingText.convertTarget),
            !result.mainResults.contains(where: { $0.text == monthDay }) {
             let candidate = Candidate(
                 text: monthDay,
