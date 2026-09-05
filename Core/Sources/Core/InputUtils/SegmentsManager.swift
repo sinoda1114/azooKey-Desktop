@@ -532,16 +532,11 @@ public final class SegmentsManager {
         }
         /// 日付・時刻変換を事前に入れておく
         let dynamicShortcuts: [DicdataElement] =
-            [
-                ("M/d", -18, DateTemplateLiteral.CalendarType.western),
-                ("yyyy/MM/dd", -18.1, .western),
-                ("yyyy-MM-dd", -18.2, .western),
-                ("M月d日（E）", -18.3, .western),
-                ("yyyy年M月d日", -18.4, .western),
-                ("Gyyyy年M月d日", -18.5, .japanese),
-                ("E曜日", -18.6, .western)
-            ].flatMap { (format, value: PValue, type) in
-                [
+            DateShortcuts.formats.flatMap { dateFormat -> [DicdataElement] in
+                let format = dateFormat.pattern
+                let value = dateFormat.value
+                let type = dateFormat.calendarType
+                return [
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "-2", deltaUnit: 60 * 60 * 24).export(), ruby: "オトトイ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "-1", deltaUnit: 60 * 60 * 24).export(), ruby: "キノウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "0", deltaUnit: 1).export(), ruby: "キョウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
@@ -564,7 +559,7 @@ public final class SegmentsManager {
 
         let leftSideContext = forcedLeftSideContext ?? self.getCleanLeftSideContext(maxCount: ContextLength.conversion)
         let rightSideContext = forcedRightSideContext ?? self.getCleanRightSideContext(maxCount: ContextLength.conversion)
-        let result = self.kanaKanjiConverter.requestCandidates(
+        var result = self.kanaKanjiConverter.requestCandidates(
             self.composingText,
             options: options(
                 leftSideContext: leftSideContext,
@@ -574,6 +569,23 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
+        // 曜日の日付候補を通常候補の後に補い、エンジンの上位候補の絞り込みによる欠落を防ぐ。
+        let weekdayShortcuts = DateShortcuts.weekdays(matching: composingText.convertTarget.toKatakana())
+        var seen = Set(result.mainResults.map(\.text))
+        let weekdayCandidates = weekdayShortcuts.compactMap { data -> Candidate? in
+            guard seen.insert(data.word).inserted else {
+                return nil
+            }
+            return Candidate(
+                text: data.word,
+                value: data.value(),
+                composingCount: .surfaceCount(composingText.convertTarget.count),
+                lastMid: data.mid,
+                data: [data],
+                isLearningTarget: false
+            )
+        }
+        result.mainResults.insert(contentsOf: weekdayCandidates, at: min(5, result.mainResults.count))
         self.rawCandidates = result
     }
 
