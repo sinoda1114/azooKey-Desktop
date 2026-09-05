@@ -58,15 +58,11 @@ extension ConverterServer {
                 value: .bool(Config.TypeHalfSpace().value)
             ),
             descriptor(
-                key: Config.DateFormatPreference.key,
-                title: "日付候補の優先書式",
+                key: Config.TypeHalfWidthLongVowelMark.key,
+                title: "ハイフンは半角を入力",
                 section: "入力オプション",
-                kind: .selector(options: [
-                    .init(title: "標準", value: .string(Config.DateFormatPreference.Value.standard.rawValue)),
-                    .init(title: "MM/DDを優先", value: .string(Config.DateFormatPreference.Value.monthDay.rawValue)),
-                    .init(title: "曜日付きを優先", value: .string(Config.DateFormatPreference.Value.weekday.rawValue))
-                ]),
-                value: .string(Config.DateFormatPreference().value.rawValue)
+                kind: .toggle,
+                value: .bool(Config.TypeHalfWidthLongVowelMark().value)
             ),
             descriptor(
                 key: Config.OptionDirectFullWidthInput.key,
@@ -244,12 +240,8 @@ extension ConverterServer {
             Config.TypeBackSlash().value = try boolSettingValue(value, key: key)
         case Config.TypeHalfSpace.key:
             Config.TypeHalfSpace().value = try boolSettingValue(value, key: key)
-        case Config.DateFormatPreference.key:
-            guard case .string(let rawValue) = value,
-                  let preference = Config.DateFormatPreference.Value(rawValue: rawValue) else {
-                throw ConverterServerError.invalidSettingValue(key)
-            }
-            Config.DateFormatPreference().value = preference
+        case Config.TypeHalfWidthLongVowelMark.key:
+            Config.TypeHalfWidthLongVowelMark().value = try boolSettingValue(value, key: key)
         case Config.OptionDirectFullWidthInput.key:
             Config.OptionDirectFullWidthInput().value = try boolSettingValue(value, key: key)
         case Config.PunctuationStyle.key:
