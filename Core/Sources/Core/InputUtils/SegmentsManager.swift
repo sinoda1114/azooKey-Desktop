@@ -574,19 +574,22 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
-        let romanInput = self.composingText.input.map(\.piece).inputString(preferIntention: false)
-        let romanTexts = Set(result.mainResults.map(\.text))
-        let romanCandidates = RomanCaseCandidates.variants(for: romanInput)
-            .filter { !romanTexts.contains($0) }.map { text in
+        let romanComposingText = self.composingText.prefixToCursorPosition()
+        let romanInput = romanComposingText.input.map(\.piece).inputString(preferIntention: false)
+        let romanVariants = RomanCaseCandidates.variants(for: romanInput)
+        if !romanVariants.isEmpty {
+            let romanTexts = Set(result.mainResults.map(\.text))
+            let romanCandidates = romanVariants.filter { !romanTexts.contains($0) }.map { text in
                 Candidate(
                     text: text, value: -18,
-                    composingCount: .inputCount(self.composingText.input.count),
+                    composingCount: .inputCount(romanComposingText.input.count),
                     lastMid: MIDData.一般.mid,
-                    data: [.init(word: text, ruby: self.composingText.convertTarget.toKatakana(), cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)],
+                    data: [.init(word: text, ruby: romanInput, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)],
                     isLearningTarget: false
                 )
             }
-        result.mainResults.insert(contentsOf: romanCandidates, at: min(5, result.mainResults.count))
+            result.mainResults.insert(contentsOf: romanCandidates, at: min(5, result.mainResults.count))
+        }
         self.rawCandidates = result
     }
 
