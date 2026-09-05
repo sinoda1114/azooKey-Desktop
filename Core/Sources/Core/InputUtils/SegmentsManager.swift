@@ -574,18 +574,21 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
-        let separatorTexts = Set(result.mainResults.map(\.text))
-        let separatorCandidates = NumericSeparatorCandidates.variants(for: self.composingText.convertTarget)
-            .filter { !separatorTexts.contains($0) }.map { text in
-                Candidate(
-                    text: text, value: -18,
-                    composingCount: .inputCount(self.composingText.input.count),
-                    lastMid: MIDData.一般.mid,
-                    data: [.init(word: text, ruby: self.composingText.convertTarget.toKatakana(), cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: -18)],
-                    isLearningTarget: false
-                )
+        let postalAddresses = PostalAddressShortcuts.addresses(matching: self.composingText.convertTarget)
+        var postalTexts = Set(result.mainResults.map(\.text))
+        let postalCandidates = postalAddresses.compactMap { address -> Candidate? in
+            guard postalTexts.insert(address).inserted else {
+                return nil
             }
-        result.mainResults.insert(contentsOf: separatorCandidates, at: min(5, result.mainResults.count))
+            return Candidate(
+                text: address, value: -18,
+                composingCount: .surfaceCount(self.composingText.convertTarget.count),
+                lastMid: MIDData.一般.mid,
+                data: [.init(word: address, ruby: self.composingText.convertTarget, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)],
+                isLearningTarget: false
+            )
+        }
+        result.mainResults.insert(contentsOf: postalCandidates, at: min(5, result.mainResults.count))
         self.rawCandidates = result
     }
 
