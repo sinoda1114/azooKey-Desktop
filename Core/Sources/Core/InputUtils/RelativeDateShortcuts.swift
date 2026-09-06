@@ -3,7 +3,7 @@ import KanaKanjiConverterModuleWithDefaultDictionary
 
 enum RelativeDateShortcuts {
     // 暦日の加算は最大10年程度に限定し、桁あふれや意図しない巨大な日付を避ける。
-    static let maximumDaysAhead = 3660
+    static let maximumDayOffset = 3660
 
     static func date(matching ruby: String, now: Date = Date(), calendar: Calendar = .current) -> Date? {
         let today = calendar.startOfDay(for: now)
@@ -24,18 +24,33 @@ enum RelativeDateShortcuts {
             let daysSinceMonday = (calendar.component(.weekday, from: today) + 5) % 7
             return calendar.date(byAdding: .day, value: 7 - daysSinceMonday + weekday, to: today)
         }
-        guard let days = daysAhead(matching: ruby) else {
+        guard let days = dayOffset(matching: ruby) else {
             return nil
         }
         return calendar.date(byAdding: .day, value: days, to: today)
     }
 
-    private static func daysAhead(matching ruby: String) -> Int? {
-        let suffix = "ニチゴ"
-        guard ruby.hasSuffix(suffix) else {
+    private static func dayOffset(matching ruby: String) -> Int? {
+        let suffix: String
+        let direction: Int
+        if ruby.hasSuffix("マエ") {
+            suffix = "マエ"
+            direction = -1
+        } else if ruby.hasSuffix("ゴ") {
+            suffix = "ゴ"
+            direction = 1
+        } else {
             return nil
         }
-        let digits = ruby.dropLast(suffix.count).unicodeScalars
+        let reading = String(ruby.dropLast(suffix.count))
+        let naturalReadings = ["イチニチ", "フツカ", "ミッカ", "ヨッカ", "イツカ", "ムイカ", "ナノカ", "ヨウカ", "ココノカ", "トオカ"]
+        if let index = naturalReadings.firstIndex(of: reading) {
+            return direction * (index + 1)
+        }
+        guard reading.hasSuffix("ニチ") else {
+            return nil
+        }
+        let digits = reading.dropLast(2).unicodeScalars
         guard !digits.isEmpty, digits.count <= 4 else {
             return nil
         }
@@ -49,10 +64,10 @@ enum RelativeDateShortcuts {
             }
             days = days * 10 + Int(value)
         }
-        guard days <= maximumDaysAhead else {
+        guard days <= maximumDayOffset else {
             return nil
         }
-        return days
+        return direction * days
     }
 
     private struct Format {

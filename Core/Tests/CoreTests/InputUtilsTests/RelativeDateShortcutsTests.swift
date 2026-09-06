@@ -53,6 +53,19 @@ struct RelativeDateShortcutsTests {
         }
     }
 
+    @Test func naturalReadingsInBothDirections() {
+        let calendar = calendar()
+        let now = date(2028, 3, 1, calendar: calendar)
+        let readings = ["イチニチ", "フツカ", "ミッカ", "ヨッカ", "イツカ", "ムイカ", "ナノカ", "ヨウカ", "ココノカ", "トオカ"]
+        for (index, reading) in readings.enumerated() {
+            for (suffix, direction) in [("ゴ", 1), ("マエ", -1)] {
+                let expected = calendar.date(byAdding: .day, value: direction * (index + 1), to: calendar.startOfDay(for: now))
+                #expect(RelativeDateShortcuts.date(matching: reading + suffix, now: now, calendar: calendar) == expected)
+            }
+        }
+        #expect(RelativeDateShortcuts.date(matching: "イチニチマエ", now: now, calendar: calendar) == date(2028, 2, 29, hour: 0, calendar: calendar))
+    }
+
     @Test func maximumOffsetAndYearBoundary() {
         let calendar = calendar()
         let now = date(2026, 12, 31, calendar: calendar)
@@ -83,13 +96,13 @@ struct RelativeDateShortcutsTests {
     }
 
     @MainActor
-    @Test(arguments: ["らいしゅうのげつよう", "らいしゅうのにちようび", "げつまつ", "3にちご", "３にちご"])
+    @Test(arguments: ["らいしゅうのげつよう", "らいしゅうのにちようび", "げつまつ", "3にちご", "３にちご", "ふつかご", "みっかご", "よっかご", "ふつかまえ", "みっかまえ"])
     func dateCanCommitWholeInput(_ reading: String) throws {
         try verifyWholeInput(reading, inputStyle: .direct)
     }
 
     @MainActor
-    @Test(arguments: ["raishuunogetsuyou", "getsumatsu", "3nichigo"])
+    @Test(arguments: ["raishuunogetsuyou", "getsumatsu", "3nichigo", "futsukago", "mikkago", "yokkago", "futsukamae", "mikkamae"])
     func romanDateCanCommitWholeInput(_ input: String) throws {
         try verifyWholeInput(input, inputStyle: .roman2kana)
     }
