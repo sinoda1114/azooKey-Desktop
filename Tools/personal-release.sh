@@ -32,6 +32,6 @@ test -f azooKeyMac/Resources/gguf/ggml-model-Q5_K_M.gguf
 
 "$(/usr/bin/command -v gh)" release create "$release_tag" "$temporary_dir/$asset_name#$asset_name" \
     --repo "$repository" --title "自分用あずき $release_tag" \
-    --notes "機能を統合したApple Silicon用の自分用ビルドです。初回は展開して personal-install-as-admin.sh を実行し、以後は personal-update.sh を実行してください。"
+    --notes "機能を統合したApple Silicon用の自分用ビルドです。初回は展開して Install Personal azooKey.command をダブルクリックし、以後は Update Personal azooKey.command を実行してください。"
 
 echo "公開完了: https://github.com/${repository}/releases/tag/${release_tag}"
