@@ -6,16 +6,24 @@ import Testing
 struct KatakanaEnglishCandidatesTests {
     @Test func returnsLowercaseAndSentenceCaseVariants() {
         #expect(KatakanaEnglishCandidates.variants(for: "セキュリティ") == ["security", "Security"])
-        #expect(KatakanaEnglishCandidates.variants(for: "ディスプレイ") == ["display", "Display"])
+        #expect(KatakanaEnglishCandidates.variants(for: "ディスプレイ").starts(with: ["display", "Display"]))
         #expect(KatakanaEnglishCandidates.variants(for: "スマートフォン") == ["smartphone", "Smartphone"])
         #expect(KatakanaEnglishCandidates.variants(for: "ベッド") == ["bed", "Bed"])
         #expect(KatakanaEnglishCandidates.variants(for: "マウス") == ["mouse", "Mouse"])
         #expect(KatakanaEnglishCandidates.variants(for: "キーボード") == ["keyboard", "Keyboard"])
-        #expect(KatakanaEnglishCandidates.variants(for: "メール") == ["email", "Email"])
+        #expect(KatakanaEnglishCandidates.variants(for: "メール").starts(with: ["email", "Email"]))
     }
 
     @Test func doesNotGuessUnknownKatakanaWords() {
         #expect(KatakanaEnglishCandidates.variants(for: "アズーキー").isEmpty)
+    }
+
+    @Test func addsCommonDictionaryWordsAfterCuratedWords() {
+        #expect(KatakanaEnglishCandidates.variants(for: "アーキテクチャ") == ["architecture", "Architecture"])
+        #expect(KatakanaEnglishCandidates.variants(for: "コンセント").starts(with: [
+            "power outlet", "Power outlet", "electrical outlet", "Electrical outlet"
+        ]))
+        #expect(!KatakanaEnglishCandidates.variants(for: "コンセント").contains("consent"))
     }
 
     @MainActor @Test func insertsEnglishSpellingIntoConversionCandidates() {

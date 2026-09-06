@@ -35,7 +35,10 @@ var targets: [Target] = [
             .product(name: "Crypto", package: "swift-crypto"),
             .product(name: "ZIPFoundation", package: "ZIPFoundation")
         ],
-        resources: [.copy("Resources/postal-addresses.tsv")],
+        resources: [
+            .copy("Resources/katakana-english-jmdict.tsv"),
+            .copy("Resources/postal-addresses.tsv")
+        ],
         swiftSettings: [.interoperabilityMode(.Cxx)],
         plugins: [
             .plugin(name: "GitInfoPlugin")
