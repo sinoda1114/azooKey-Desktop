@@ -634,6 +634,12 @@ public final class SegmentsManager {
                 }
                 return Candidate(text: word, value: -18, composingCount: .surfaceCount(self.composingText.convertTarget.count), lastMid: MIDData.一般.mid, data: [.init(word: word, ruby: reading, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)], isLearningTarget: false)
             })
+            insert(EmojiShortcutCandidates.variants(for: reading).compactMap { emoji in
+                guard seen.insert(emoji).inserted else {
+                    return nil
+                }
+                return Candidate(text: emoji, value: -18, composingCount: .surfaceCount(self.composingText.convertTarget.count), lastMid: MIDData.一般.mid, data: [.init(word: emoji, ruby: reading, cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: -18)], isLearningTarget: false)
+            })
             insert(DateShortcuts.weekdays(matching: self.composingText.convertTarget.toKatakana()).compactMap { data in
                 guard seen.insert(data.word).inserted else {
                     return nil
