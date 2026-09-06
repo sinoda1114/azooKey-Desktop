@@ -26,6 +26,14 @@ struct KatakanaEnglishCandidatesTests {
         #expect(!KatakanaEnglishCandidates.variants(for: "コンセント").contains("consent"))
     }
 
+    @Test func returnsITTermsAndServiceNamesWithTheirOfficialCapitalization() {
+        #expect(KatakanaEnglishCandidates.variants(for: "エーピーアイ") == ["API"])
+        #expect(KatakanaEnglishCandidates.variants(for: "プルリクエスト").starts(with: ["pull request", "Pull request"]))
+        #expect(KatakanaEnglishCandidates.variants(for: "ギットハブ") == ["GitHub"])
+        #expect(KatakanaEnglishCandidates.variants(for: "スーパーベース") == ["Supabase"])
+        #expect(KatakanaEnglishCandidates.variants(for: "チャットジーピーティー") == ["ChatGPT"])
+    }
+
     @MainActor @Test func insertsEnglishSpellingIntoConversionCandidates() {
         let manager = SegmentsManager(
             kanaKanjiConverter: .withDefaultDictionary(),
