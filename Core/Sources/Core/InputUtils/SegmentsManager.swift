@@ -564,7 +564,7 @@ public final class SegmentsManager {
 
         let leftSideContext = forcedLeftSideContext ?? self.getCleanLeftSideContext(maxCount: ContextLength.conversion)
         let rightSideContext = forcedRightSideContext ?? self.getCleanRightSideContext(maxCount: ContextLength.conversion)
-        let result = self.kanaKanjiConverter.requestCandidates(
+        var result = self.kanaKanjiConverter.requestCandidates(
             self.composingText,
             options: options(
                 leftSideContext: leftSideContext,
@@ -574,6 +574,27 @@ public final class SegmentsManager {
                 requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
             )
         )
+        if self.composingText.isAtEndIndex {
+            let reading = self.composingText.convertTarget.toKatakana()
+            let englishWords = KatakanaEnglishCandidates.variants(for: reading)
+            if !englishWords.isEmpty {
+                var seen = Set(result.mainResults.map(\.text))
+                let candidates = englishWords.compactMap { word -> Candidate? in
+                    guard seen.insert(word).inserted else {
+                        return nil
+                    }
+                    return Candidate(
+                        text: word,
+                        value: -18,
+                        composingCount: .surfaceCount(self.composingText.convertTarget.count),
+                        lastMid: MIDData.一般.mid,
+                        data: [.init(word: word, ruby: reading, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)],
+                        isLearningTarget: false
+                    )
+                }
+                result.mainResults.insert(contentsOf: candidates, at: min(5, result.mainResults.count))
+            }
+        }
         self.rawCandidates = result
     }
 
