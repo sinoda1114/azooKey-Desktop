@@ -23,8 +23,12 @@ installer_identity="${DEVELOPER_ID_INSTALLER_IDENTITY:?DEVELOPER_ID_INSTALLER_ID
 notary_profile="${NOTARYTOOL_PROFILE:-azooKeyPersonalNotary}"
 signing_keychain="${SIGNING_KEYCHAIN_PATH:-/Users/sinoda/Library/Keychains/azooKeyPersonalSigning.keychain-db}"
 signing_keychain_password_file="${SIGNING_KEYCHAIN_PASSWORD_FILE:-/Users/sinoda/.config/azookey-personal/signing-keychain-password}"
+original_default_keychain=""
 
 cleanup() {
+    if [ -n "${original_default_keychain}" ]; then
+        /usr/bin/security default-keychain -d user -s "${original_default_keychain}" || true
+    fi
     /bin/rm -rf "${temporary_dir}"
 }
 trap cleanup EXIT
@@ -37,6 +41,8 @@ test -f "${signing_keychain}"
 test -f "${signing_keychain_password_file}"
 signing_keychain_password="$(/bin/cat "${signing_keychain_password_file}")"
 /usr/bin/security unlock-keychain -p "${signing_keychain_password}" "${signing_keychain}"
+original_default_keychain="$(/usr/bin/security default-keychain -d user | /usr/bin/sed 's/^[[:space:]]*//; s/\"//g')"
+/usr/bin/security default-keychain -d user -s "${signing_keychain}"
 
 /usr/bin/xcodebuild \
     -project azooKeyMac.xcodeproj \
@@ -67,6 +73,8 @@ app_path="${derived_data}/Build/Products/Release/azooKeyMac.app"
     "${unsigned_pkg}"
 
 /usr/bin/productsign --sign "${installer_identity}" --keychain "${signing_keychain}" --timestamp "${unsigned_pkg}" "${signed_pkg}"
+/usr/bin/security default-keychain -d user -s "${original_default_keychain}"
+original_default_keychain=""
 /usr/sbin/pkgutil --check-signature "${signed_pkg}"
 /usr/bin/xcrun notarytool submit "${signed_pkg}" --keychain-profile "${notary_profile}" --wait
 /usr/bin/xcrun stapler staple "${signed_pkg}"
