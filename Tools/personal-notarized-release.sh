@@ -39,13 +39,12 @@ test -f azooKeyMac/Resources/gguf/ggml-model-Q5_K_M.gguf
     -jobs 4 \
     -derivedDataPath "${derived_data}" \
     ARCHS=arm64 \
-    DEVELOPMENT_TEAM="${team_id}" \
-    CODE_SIGN_IDENTITY="${app_identity}" \
-    OTHER_CODE_SIGN_FLAGS="--timestamp --options runtime" \
-    -allowProvisioningUpdates \
+    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGNING_REQUIRED=NO \
     build
 
 app_path="${derived_data}/Build/Products/Release/azooKeyMac.app"
+/usr/bin/codesign --force --deep --options runtime --timestamp --sign "${app_identity}" "${app_path}"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "${app_path}"
 
 /bin/mkdir -p "${payload_root}/Library/Input Methods" "${scripts_dir}"
