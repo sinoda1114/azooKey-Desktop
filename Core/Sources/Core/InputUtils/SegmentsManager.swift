@@ -17,13 +17,25 @@ public final class SegmentsManager {
     /// テストなどの設定注入のための型。外部には設定を露出させない。
     public struct Context {
         public init() {}
-        public init(useZenzai: Bool, resourcesDirectoryURL: URL? = nil) {
+        public init(
+            useZenzai: Bool,
+            resourcesDirectoryURL: URL? = nil,
+            liveConversionEnabled: Bool? = nil,
+            typeHalfWidthLongVowelMark: Bool? = nil,
+            dateFormatPreference: Config.DateFormatPreference.Value? = nil
+        ) {
             self.useZenzai = useZenzai
             self.resourcesDirectoryURL = resourcesDirectoryURL
+            self.liveConversionEnabled = liveConversionEnabled
+            self.typeHalfWidthLongVowelMark = typeHalfWidthLongVowelMark
+            self.dateFormatPreference = dateFormatPreference
         }
 
         var useZenzai: Bool = true
         var resourcesDirectoryURL: URL?
+        var liveConversionEnabled: Bool?
+        var typeHalfWidthLongVowelMark: Bool?
+        var dateFormatPreference: Config.DateFormatPreference.Value?
     }
 
     public weak var delegate: (any SegmentManagerDelegate)?
@@ -36,7 +48,11 @@ public final class SegmentsManager {
     private var lastInputStyle: InputStyle = .direct
 
     private var liveConversionEnabled: Bool {
-        Config.LiveConversion().value
+        self.context.liveConversionEnabled ?? Config.LiveConversion().value
+    }
+    private var prefersHalfWidthStandaloneLongVowelMark: Bool {
+        self.composingText.convertTarget == "ー"
+            && (self.context.typeHalfWidthLongVowelMark ?? Config.TypeHalfWidthLongVowelMark().value)
     }
     private var zenzaiPersonalizationLevel: Config.ZenzaiPersonalizationLevel.Value {
         Config.ZenzaiPersonalizationLevel().value
@@ -532,16 +548,11 @@ public final class SegmentsManager {
         }
         /// 日付・時刻変換を事前に入れておく
         let dynamicShortcuts: [DicdataElement] =
-            [
-                ("M/d", -18, DateTemplateLiteral.CalendarType.western),
-                ("yyyy/MM/dd", -18.1, .western),
-                ("yyyy-MM-dd", -18.2, .western),
-                ("M月d日（E）", -18.3, .western),
-                ("yyyy年M月d日", -18.4, .western),
-                ("Gyyyy年M月d日", -18.5, .japanese),
-                ("E曜日", -18.6, .western)
-            ].flatMap { (format, value: PValue, type) in
-                [
+            DateShortcutFormats.all.flatMap { dateFormat -> [DicdataElement] in
+                let format = dateFormat.pattern
+                let value = dateFormat.value
+                let type = dateFormat.calendar
+                return [
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "-2", deltaUnit: 60 * 60 * 24).export(), ruby: "オトトイ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "-1", deltaUnit: 60 * 60 * 24).export(), ruby: "キノウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
                     .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "0", deltaUnit: 1).export(), ruby: "キョウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
@@ -589,7 +600,85 @@ public final class SegmentsManager {
             }
             result.mainResults.insert(contentsOf: arrowCandidates, at: min(5, result.mainResults.count))
         }
+        self.addPersonalCandidates(to: &result, dynamicShortcuts: dynamicShortcuts)
         self.rawCandidates = result
+    }
+
+    // このブランチで組み合わせる候補群を、通常の変換結果の後に補う。
+    @MainActor
+    // swiftlint:disable:next cyclomatic_complexity
+    private func addPersonalCandidates(to result: inout ConversionResult, dynamicShortcuts: [DicdataElement]) {
+        if self.prefersHalfWidthStandaloneLongVowelMark {
+            let preferred = ["ｰ", "ー"].map { text in
+                Candidate(text: text, value: 0, composingCount: .surfaceCount(1), lastMid: MIDData.一般.mid,
+                          data: [.init(word: text, ruby: "ー", cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: 0)],
+                          isLearningTarget: false)
+            }
+            let preferredTexts = Set(preferred.map(\.text))
+            result.mainResults = preferred + result.mainResults.filter { !preferredTexts.contains($0.text) }
+            result.firstClauseResults = preferred + result.firstClauseResults.filter { !preferredTexts.contains($0.text) }
+        }
+        let fullInput = self.composingText.prefixToCursorPosition()
+        var seen = Set(result.mainResults.map(\.text))
+        func insert(_ candidates: [Candidate]) {
+            guard !candidates.isEmpty else {
+                return
+            }
+            result.mainResults.insert(contentsOf: candidates, at: min(5, result.mainResults.count))
+        }
+        if self.composingText.isAtEndIndex {
+            insert(DateShortcuts.weekdays(matching: self.composingText.convertTarget.toKatakana()).compactMap { data in
+                guard seen.insert(data.word).inserted else {
+                    return nil
+                }
+                return Candidate(text: data.word, value: data.value(), composingCount: .surfaceCount(self.composingText.convertTarget.count), lastMid: data.mid, data: [data], isLearningTarget: false)
+            })
+            if let monthDay = NumericDateShortcuts.monthDay(matching: self.composingText.convertTarget), seen.insert(monthDay).inserted {
+                insert([Candidate(text: monthDay, value: -18, composingCount: .surfaceCount(self.composingText.convertTarget.count), lastMid: MIDData.一般.mid, data: [.init(word: monthDay, ruby: self.composingText.convertTarget, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)], isLearningTarget: false)])
+            }
+            insert(PostalAddressShortcuts.addresses(matching: self.composingText.convertTarget).compactMap { address in
+                guard seen.insert(address).inserted else {
+                    return nil
+                }
+                return Candidate(text: address, value: -18, composingCount: .surfaceCount(self.composingText.convertTarget.count), lastMid: MIDData.一般.mid, data: [.init(word: address, ruby: self.composingText.convertTarget, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)], isLearningTarget: false)
+            })
+            insert(RelativeDateShortcuts.candidates(matching: self.composingText.convertTarget.toKatakana()).compactMap { data in
+                guard seen.insert(data.word).inserted else {
+                    return nil
+                }
+                return Candidate(text: data.word, value: data.value(), composingCount: .surfaceCount(self.composingText.convertTarget.count), lastMid: data.mid, data: [data], isLearningTarget: false)
+            })
+            let dateEntries = dynamicShortcuts.compactMap { entry -> DicdataElement? in
+                guard entry.ruby == self.composingText.convertTarget.toKatakana(), entry.word.hasPrefix("<date ") else {
+                    return nil
+                }
+                let template = DateTemplateLiteral.import(from: entry.word)
+                guard template.format.contains("d") else {
+                    return nil
+                }
+                return .init(word: template.previewString(), ruby: entry.ruby, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: entry.value())
+            }
+            DateCandidatePreference.apply(to: &result, dateEntries: dateEntries, readingCount: self.composingText.convertTarget.count, preference: self.context.dateFormatPreference ?? Config.DateFormatPreference().value)
+            insert(HyphenatedCodeCandidates.variants(for: self.composingText.convertTarget).compactMap { text in
+                guard seen.insert(text).inserted else {
+                    return nil
+                }
+                return Candidate(text: text, value: -18, composingCount: .surfaceCount(self.composingText.convertTarget.count), lastMid: MIDData.一般.mid, data: [.init(word: text, ruby: self.composingText.convertTarget, cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: -18)], isLearningTarget: false)
+            })
+        }
+        insert(NumericSeparatorCandidates.variants(for: fullInput.convertTarget).compactMap { text in
+            guard seen.insert(text).inserted else {
+                return nil
+            }
+            return Candidate(text: text, value: -18, composingCount: .inputCount(fullInput.input.count), lastMid: MIDData.一般.mid, data: [.init(word: text, ruby: fullInput.convertTarget.toKatakana(), cid: CIDData.記号.cid, mid: MIDData.一般.mid, value: -18)], isLearningTarget: false)
+        })
+        let romanInput = fullInput.input.map(\.piece).inputString(preferIntention: false)
+        insert(RomanCaseCandidates.variants(for: romanInput).compactMap { text in
+            guard seen.insert(text).inserted else {
+                return nil
+            }
+            return Candidate(text: text, value: -18, composingCount: .inputCount(fullInput.input.count), lastMid: MIDData.一般.mid, data: [.init(word: text, ruby: romanInput, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)], isLearningTarget: false)
+        })
     }
 
     @MainActor public func update(requestRichCandidates: Bool) {
@@ -1073,7 +1162,9 @@ public final class SegmentsManager {
         case .none, .attachDiacritic:
             return MarkedText(text: [], selectionRange: .notFound)
         case .composing:
-            let text = if self.lastOperation == .delete {
+            let text = if self.prefersHalfWidthStandaloneLongVowelMark {
+                "ｰ"
+            } else if self.lastOperation == .delete {
                 // 削除のあとは常にひらがなを示す
                 self.composingText.convertTarget
             } else if self.liveConversionEnabled,
