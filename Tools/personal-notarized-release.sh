@@ -21,6 +21,8 @@ team_id="${DEVELOPMENT_TEAM_ID:-4F94FTUS6D}"
 app_identity="${DEVELOPER_ID_APPLICATION_IDENTITY:?DEVELOPER_ID_APPLICATION_IDENTITY を設定してください}"
 installer_identity="${DEVELOPER_ID_INSTALLER_IDENTITY:?DEVELOPER_ID_INSTALLER_IDENTITY を設定してください}"
 notary_profile="${NOTARYTOOL_PROFILE:-azooKeyPersonalNotary}"
+signing_keychain="${SIGNING_KEYCHAIN_PATH:-/Users/sinoda/Library/Keychains/azooKeyPersonalSigning.keychain-db}"
+signing_keychain_password_file="${SIGNING_KEYCHAIN_PASSWORD_FILE:-/Users/sinoda/.config/azookey-personal/signing-keychain-password}"
 
 cleanup() {
     /bin/rm -rf "${temporary_dir}"
@@ -31,6 +33,10 @@ cd "${repository_root}"
 test -z "$(/usr/bin/git status --porcelain)"
 test -f azooKeyMac/Resources/base_n5_lm/lm_c_abc.marisa
 test -f azooKeyMac/Resources/gguf/ggml-model-Q5_K_M.gguf
+test -f "${signing_keychain}"
+test -f "${signing_keychain_password_file}"
+signing_keychain_password="$(/bin/cat "${signing_keychain_password_file}")"
+/usr/bin/security unlock-keychain -p "${signing_keychain_password}" "${signing_keychain}"
 
 /usr/bin/xcodebuild \
     -project azooKeyMac.xcodeproj \
@@ -44,7 +50,7 @@ test -f azooKeyMac/Resources/gguf/ggml-model-Q5_K_M.gguf
     build
 
 app_path="${derived_data}/Build/Products/Release/azooKeyMac.app"
-/usr/bin/codesign --force --deep --options runtime --timestamp --sign "${app_identity}" "${app_path}"
+/usr/bin/codesign --force --deep --options runtime --timestamp --keychain "${signing_keychain}" --sign "${app_identity}" "${app_path}"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "${app_path}"
 
 /bin/mkdir -p "${payload_root}/Library/Input Methods" "${scripts_dir}"
@@ -60,7 +66,7 @@ app_path="${derived_data}/Build/Products/Release/azooKeyMac.app"
     --install-location / \
     "${unsigned_pkg}"
 
-/usr/bin/productsign --sign "${installer_identity}" --timestamp "${unsigned_pkg}" "${signed_pkg}"
+/usr/bin/productsign --sign "${installer_identity}" --keychain "${signing_keychain}" --timestamp "${unsigned_pkg}" "${signed_pkg}"
 /usr/sbin/pkgutil --check-signature "${signed_pkg}"
 /usr/bin/xcrun notarytool submit "${signed_pkg}" --keychain-profile "${notary_profile}" --wait
 /usr/bin/xcrun stapler staple "${signed_pkg}"
