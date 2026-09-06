@@ -627,6 +627,13 @@ public final class SegmentsManager {
             result.mainResults.insert(contentsOf: candidates, at: min(5, result.mainResults.count))
         }
         if self.composingText.isAtEndIndex {
+            let reading = self.composingText.convertTarget.toKatakana()
+            insert(KatakanaEnglishCandidates.variants(for: reading).compactMap { word in
+                guard seen.insert(word).inserted else {
+                    return nil
+                }
+                return Candidate(text: word, value: -18, composingCount: .surfaceCount(self.composingText.convertTarget.count), lastMid: MIDData.一般.mid, data: [.init(word: word, ruby: reading, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: -18)], isLearningTarget: false)
+            })
             insert(DateShortcuts.weekdays(matching: self.composingText.convertTarget.toKatakana()).compactMap { data in
                 guard seen.insert(data.word).inserted else {
                     return nil
