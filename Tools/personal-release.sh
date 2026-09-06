@@ -24,7 +24,9 @@ test -f azooKeyMac/Resources/gguf/ggml-model-Q5_K_M.gguf
 /usr/bin/ditto "$derived_data/Build/Products/Debug/azooKeyMac.app" "$release_dir/azooKeyMac.app"
 /bin/cp Tools/personal-install-as-admin.sh "$release_dir/personal-install-as-admin.sh"
 /bin/cp Tools/personal-update.sh "$release_dir/personal-update.sh"
-/bin/chmod 755 "$release_dir/personal-install-as-admin.sh" "$release_dir/personal-update.sh"
+/bin/cp "Tools/Install Personal azooKey.command" "$release_dir/Install Personal azooKey.command"
+/bin/cp "Tools/Update Personal azooKey.command" "$release_dir/Update Personal azooKey.command"
+/bin/chmod 755 "$release_dir"/*.sh "$release_dir"/*.command
 /usr/bin/codesign --verify --deep --strict "$release_dir/azooKeyMac.app"
 /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$release_dir" "$temporary_dir/$asset_name"
 
